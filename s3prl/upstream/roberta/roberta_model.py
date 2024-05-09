@@ -2318,7 +2318,7 @@ class TransformerConfig:
         },
     )
     adaptive_input: bool = False
-    encoder: EncDecBaseConfig = EncDecBaseConfig()
+    encoder: EncDecBaseConfig = field(default=EncDecBaseConfig)
     # TODO should really be in the encoder config
     max_source_positions: int = field(
         default=DEFAULT_MAX_SOURCE_POSITIONS,
