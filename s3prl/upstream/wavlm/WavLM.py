@@ -161,7 +161,9 @@ def compute_mask_indices(
 
 class WavLMConfig:
     def __init__(self, cfg=None):
-        self.extractor_mode: str = "default"  # mode for feature extractor. default has a single group norm with d groups in the first conv block, whereas layer_norm has layer norms in every block (meant to use with normalize=True)
+        self.extractor_mode: str = (
+            "default"  # mode for feature extractor. default has a single group norm with d groups in the first conv block, whereas layer_norm has layer norms in every block (meant to use with normalize=True)
+        )
         self.encoder_layers: int = 12  # num encoder layers in the transformer
 
         self.encoder_embed_dim: int = 768  # encoder embedding dimension
@@ -170,7 +172,9 @@ class WavLMConfig:
         self.activation_fn: str = "gelu"  # activation function to use
 
         self.layer_norm_first: bool = False  # apply layernorm first in the transformer
-        self.conv_feature_layers: str = "[(512,10,5)] + [(512,3,2)] * 4 + [(512,2,2)] * 2"  # string describing convolutional feature extraction layers in form of a python list that contains [(dim, kernel_size, stride), ...]
+        self.conv_feature_layers: str = (
+            "[(512,10,5)] + [(512,3,2)] * 4 + [(512,2,2)] * 2"  # string describing convolutional feature extraction layers in form of a python list that contains [(dim, kernel_size, stride), ...]
+        )
         self.conv_bias: bool = False  # include bias in conv encoder
         self.feature_grad_mult: float = (
             1.0  # multiply feature extractor var grads by this
@@ -200,7 +204,9 @@ class WavLMConfig:
         self.mask_length: int = 10  # mask length
         self.mask_prob: float = 0.65  # probability of replacing a token with mask
         self.mask_selection: str = "static"  # how to choose mask length
-        self.mask_other: float = 0  # secondary mask argument (used for more complex distributions), see help in compute_mask_indicesh
+        self.mask_other: float = (
+            0  # secondary mask argument (used for more complex distributions), see help in compute_mask_indicesh
+        )
         self.no_mask_overlap: bool = False  # whether to allow masks to overlap
         self.mask_min_space: int = (
             1  # min space between spans (if no overlap is enabled)
@@ -212,7 +218,9 @@ class WavLMConfig:
         self.mask_channel_selection: str = (
             "static"  # how to choose mask length for channel masking
         )
-        self.mask_channel_other: float = 0  # secondary mask argument (used for more complex distributions), see help in compute_mask_indices
+        self.mask_channel_other: float = (
+            0  # secondary mask argument (used for more complex distributions), see help in compute_mask_indices
+        )
         self.no_mask_channel_overlap: bool = (
             False  # whether to allow channel masks to overlap
         )
@@ -289,52 +297,8 @@ class WavLM(nn.Module):
 
         self.feature_grad_mult = cfg.feature_grad_mult
 
-        self.mask_emb = nn.Parameter(
-            torch.FloatTensor(cfg.encoder_embed_dim).uniform_()
-        )
-
         self.encoder = TransformerEncoder(cfg)
         self.layer_norm = LayerNorm(self.embed)
-
-    def apply_mask(self, x, padding_mask):
-        B, T, C = x.shape
-        if self.mask_prob > 0:
-            mask_indices = compute_mask_indices(
-                (B, T),
-                padding_mask,
-                self.mask_prob,
-                self.mask_length,
-                self.mask_selection,
-                self.mask_other,
-                min_masks=2,
-                no_overlap=self.no_mask_overlap,
-                min_space=self.mask_min_space,
-            )
-            mask_indices = torch.from_numpy(mask_indices).to(x.device)
-            x[mask_indices] = self.mask_emb
-        else:
-            mask_indices = None
-
-        if self.mask_channel_prob > 0:
-            mask_channel_indices = compute_mask_indices(
-                (B, C),
-                None,
-                self.mask_channel_prob,
-                self.mask_channel_length,
-                self.mask_channel_selection,
-                self.mask_channel_other,
-                no_overlap=self.no_mask_channel_overlap,
-                min_space=self.mask_channel_min_space,
-            )
-            mask_channel_indices = (
-                torch.from_numpy(mask_channel_indices)
-                .to(x.device)
-                .unsqueeze(1)
-                .expand(-1, T, -1)
-            )
-            x[mask_channel_indices] = 0
-
-        return x, mask_indices
 
     def forward_padding_mask(
         self,
@@ -352,7 +316,6 @@ class WavLM(nn.Module):
         self,
         source: torch.Tensor,
         padding_mask: Optional[torch.Tensor] = None,
-        mask: bool = False,
         ret_conv: bool = False,
         output_layer: Optional[int] = None,
         ret_layer_results: bool = False,
@@ -376,18 +339,13 @@ class WavLM(nn.Module):
 
         features = self.dropout_input(features)
 
-        if mask:
-            x, mask_indices = self.apply_mask(features, padding_mask)
-        else:
-            x = features
-
         # feature: (B, T, D), float
         # target: (B, T), long
         # x: (B, T, D), float
         # padding_mask: (B, T), bool
         # mask_indices: (B, T), bool
         x, layer_results = self.encoder(
-            x,
+            features,
             padding_mask=padding_mask,
             layer=None if output_layer is None else output_layer - 1,
         )

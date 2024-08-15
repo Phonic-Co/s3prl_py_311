@@ -83,7 +83,6 @@ class UpstreamExpert(UpstreamBase):
         features, feat_padding_mask = self.model.extract_features(
             padded_wav,
             padding_mask=wav_padding_mask,
-            mask=False,
         )
 
         # This forward function only does the model forward
