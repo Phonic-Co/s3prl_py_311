@@ -68,21 +68,24 @@ class UpstreamExpert(UpstreamBase):
     def get_downsample_rates(self, key: str) -> int:
         return 320
 
-    def forward(self, wavs):
-        if self.cfg.normalize:
-            wavs = [F.layer_norm(wav, wav.shape) for wav in wavs]
+    def forward(self, waveforms, waveform_seq_lens):
+        """
+        Args:
+            waveforms: a tensor of waveforms with shape (batch_size, max_seq_len)
+            waveform_seq_lens: a tensor of sequence lengths, with shape (batch_size,)
+        """
+        _, max_seq_len = waveforms.size()
 
-        device = wavs[0].device
-        wav_lengths = torch.LongTensor([len(wav) for wav in wavs]).to(device)
-        wav_padding_mask = ~torch.lt(
-            torch.arange(max(wav_lengths)).unsqueeze(0).to(device),
-            wav_lengths.unsqueeze(1),
-        )
-        padded_wav = pad_sequence(wavs, batch_first=True)
+        if self.cfg.normalize:
+            waveforms = F.layer_norm(waveforms, (max_seq_len,))
+
+        padding_mask = torch.arange(max_seq_len, device=waveforms.device).unsqueeze(
+            0
+        ) >= waveform_seq_lens.unsqueeze(1)
 
         features, feat_padding_mask = self.model.extract_features(
-            padded_wav,
-            padding_mask=wav_padding_mask,
+            waveforms,
+            padding_mask=padding_mask,
             mask=False,
         )
 
