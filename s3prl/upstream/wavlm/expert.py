@@ -68,7 +68,7 @@ class UpstreamExpert(UpstreamBase):
     def get_downsample_rates(self, key: str) -> int:
         return 320
 
-    def forward(self, wavs):
+    def forward(self, wavs, wav_seq_lens):
         if self.cfg.normalize:
             wavs = [F.layer_norm(wav, wav.shape) for wav in wavs]
 
